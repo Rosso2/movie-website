@@ -75,7 +75,24 @@
     #loading {
       display: none;
       font-size: 1.2rem;
-      color: #4CAF50;
+      color: #e50914; /* Netflix red */
+      margin: 20px 0;
+    }
+    /* New styling for the Load More button */
+    #loadMoreBtn {
+      display: none;
+      background-color: #e50914;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      font-size: 1rem;
+      border-radius: 5px;
+      cursor: pointer;
+      margin: 20px auto 60px auto;
+      transition: background-color 0.2s;
+    }
+    #loadMoreBtn:hover {
+      background-color: #f40612;
     }
   </style>
 </head>
@@ -85,94 +102,73 @@
     <h1>🎬 raphmovie Catalogue</h1>
     <p>Upload your Letterboxd CSV to generate your visual database.</p>
     <input type="file" id="csvFileInput" accept=".csv">
-    <p id="loading">Reading database and fetching posters...</p>
+    <p id="loading">Loading movies... please wait.</p>
   </div>
 
   <div class="movie-grid" id="movie-container"></div>
+  
+  <button id="loadMoreBtn">Load More Movies</button>
 
   <script>
-    // 1. Paste your TMDB API Key here!
+    // 1. PASTE YOUR TMDB API KEY HERE!
     const API_KEY = 'f6b6cac733975d8c7f6a17ceba13fcba';
     
     const fileInput = document.getElementById('csvFileInput');
     const container = document.getElementById('movie-container');
     const loadingText = document.getElementById('loading');
+    const loadMoreBtn = document.getElementById('loadMoreBtn');
 
-    // 2. Listen for when the user uploads a file
+    // Variables to keep track of our batch loading
+    let allMovies = [];
+    let currentIndex = 0;
+    const BATCH_SIZE = 18; // Loads 18 movies at a time
+
+    // Listen for file upload
     fileInput.addEventListener('change', function(event) {
       const file = event.target.files[0];
       if (!file) return;
 
-      container.innerHTML = ''; // Clear old movies
-      loadingText.style.display = 'block'; // Show loading text
-
-      // 3. Use PapaParse to read the CSV
+      container.innerHTML = ''; 
+      
       Papa.parse(file, {
-        header: true, // Tells the parser the first row contains column names (Name, Year, etc.)
+        header: true,
         skipEmptyLines: true,
-        complete: async function(results) {
-          const movies = results.data;
+        complete: function(results) {
+          // Filter out any broken rows that don't have a name
+          allMovies = results.data.filter(row => row['Name'] && row['Year']);
+          currentIndex = 0; 
           
-          // Grab only the first 12 movies to prevent API blocking
-          const moviesToLoad = movies.slice(0, 12);
-
-          // Loop through each movie in the CSV
-          for (let row of moviesToLoad) {
-            const title = row['Name'];
-            const year = row['Year'];
-            
-            if (title && year) {
-              await fetchAndDisplayMovie(title, year);
-            }
-          }
-          loadingText.style.display = 'none'; // Hide loading text when done
+          // Start loading the first batch
+          loadNextBatch();
         }
       });
     });
 
-    // 4. Function to ask TMDB for the movie details
-    async function fetchAndDisplayMovie(title, year) {
-      try {
-        // Step A: Search for the movie to get its TMDB ID
-        const searchUrl = `https://api.themoviedb.org/3/search/movie?api_key=${API_KEY}&query=${encodeURIComponent(title)}&year=${year}`;
-        const searchRes = await fetch(searchUrl);
-        const searchData = await searchRes.json();
+    // Function to load the next chunk of movies
+    async function loadNextBatch() {
+      loadingText.style.display = 'block';
+      loadMoreBtn.style.display = 'none';
 
-        if (searchData.results && searchData.results.length > 0) {
-          const movieId = searchData.results[0].id;
+      // Slice the next 18 movies from our total list
+      const moviesToLoad = allMovies.slice(currentIndex, currentIndex + BATCH_SIZE);
 
-          // Step B: Use the ID to get extra details (Director, Country, Genres)
-          const detailsUrl = `https://api.themoviedb.org/3/movie/${movieId}?api_key=${API_KEY}&append_to_response=credits`;
-          const detailsRes = await fetch(detailsUrl);
-          const movieData = await detailsRes.json();
+      for (let row of moviesToLoad) {
+        await fetchAndDisplayMovie(row['Name'], row['Year']);
+      }
 
-          // Extract the data we want
-          const poster = movieData.poster_path ? `https://image.tmdb.org/t/p/w500${movieData.poster_path}` : 'https://via.placeholder.com/500x750?text=No+Poster';
-          const genres = movieData.genres.map(g => g.name).join(', ');
-          const country = movieData.production_countries.length > 0 ? movieData.production_countries[0].name : 'Unknown Country';
-          
-          // Find the Director in the credits array
-          const directorObj = movieData.credits.crew.find(person => person.job === 'Director');
-          const director = directorObj ? directorObj.name : 'Unknown Director';
+      // Update our tracker
+      currentIndex += BATCH_SIZE;
+      loadingText.style.display = 'none';
 
-          // Step C: Build the HTML card
-          const card = document.createElement('div');
-          card.className = 'movie-card';
-          card.innerHTML = `
-            <img src="${poster}" alt="${title}">
-            <div class="movie-info">
-              <h3>${title} (${year})</h3>
-              <p><strong>Director:</strong> ${director}</p>
-              <p><strong>Country:</strong> ${country}</p>
-              <span class="tag">${genres.split(',')[0]}</span> </div>
-          `;
-          container.appendChild(card);
-        }
-      } catch (error) {
-        console.error(`Failed to load ${title}:`, error);
+      // If we haven't reached the end of the list, show the button again
+      if (currentIndex < allMovies.length) {
+        loadMoreBtn.style.display = 'inline-block';
       }
     }
-  </script>
 
-</body>
-</html>
+    // When the button is clicked, load the next batch!
+    loadMoreBtn.addEventListener('click', loadNextBatch);
+
+    async function fetchAndDisplayMovie(title, year) {
+      try {
+        const searchUrl = `https://api.themoviedb.org/3/search/movie?api_key=${API_KEY}&query

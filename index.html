@@ -7,17 +7,32 @@
   
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
   
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  
   <style>
-    body { font-family: 'Segoe UI', sans-serif; background-color: #141414; color: white; text-align: center; padding: 20px; }
-    .controls { margin-bottom: 30px; }
+    body { font-family: 'Segoe UI', sans-serif; background-color: #141414; color: white; text-align: center; padding: 20px; margin: 0; }
+    
+    /* Navigation Tabs */
+    .tabs { margin: 20px 0 30px 0; }
+    .tab-btn { background: #333; color: white; border: none; padding: 12px 30px; margin: 0 5px; font-size: 1rem; cursor: pointer; border-radius: 5px; transition: background 0.2s; }
+    .tab-btn.active { background: #e50914; font-weight: bold; }
+    .tab-btn:hover:not(.active) { background: #555; }
+
+    .controls { margin-bottom: 20px; }
     input[type="file"] { background: #333; color: white; padding: 10px; border-radius: 5px; cursor: pointer; }
     #goBtn { display: none; background: #4CAF50; color: white; border: none; padding: 11px 24px; margin-left: 10px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 1rem; }
     #goBtn:hover { background: #45a049; }
-    #loading { display: none; color: #4CAF50; margin-top: 20px; font-size: 1.1rem; }
+    #loading { display: none; color: #4CAF50; margin-top: 15px; font-size: 1.1rem; }
     
+    /* Views */
+    #catalogue-view { display: block; }
+    #map-view { display: none; width: 100%; max-width: 1200px; margin: 0 auto; height: 600px; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+    #map { width: 100%; height: 100%; background: #222; }
+
     .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; max-width: 1200px; margin: 0 auto; }
     .card { background: #222; border-radius: 8px; overflow: hidden; text-decoration: none; color: white; display: flex; flex-direction: column; transition: transform 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
-    .card:hover { transform: scale(1.04); box-shadow: 0 4px 20px rgba(76, 175, 80, 0.4); }
+    .card:hover { transform: scale(1.04); box-shadow: 0 4px 20px rgba(229, 9, 20, 0.4); }
     .card img { width: 100%; height: 300px; object-fit: cover; }
     .info { padding: 15px; text-align: left; }
     .info h3 { margin: 0 0 5px 0; font-size: 1rem; }
@@ -25,52 +40,101 @@
     
     #loadMoreBtn { display: none; background: #e50914; color: white; border: none; padding: 12px 24px; margin-top: 40px; border-radius: 5px; cursor: pointer; font-size: 1rem; }
     #loadMoreBtn:hover { background: #f40612; }
+
+    /* Customizing the map popups */
+    .leaflet-popup-content { text-align: center; color: #141414; }
+    .leaflet-popup-content img { border-radius: 4px; margin-top: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
   </style>
 </head>
 <body>
 
+  <h1>🍿 raphmovie Universe</h1>
+  
+  <div class="tabs">
+    <button id="tab-catalogue" class="tab-btn active">Grid Catalogue</button>
+    <button id="tab-map" class="tab-btn">World Map</button>
+  </div>
+
   <div class="controls">
-    <h1>🍿 raphmovie Catalogue</h1>
-    <p>Upload your Letterboxd CSV database below:</p>
     <input type="file" id="csvFile" accept=".csv">
     <button id="goBtn">Go!</button>
     <p id="loading">Loading your movies... please wait.</p>
   </div>
 
-  <div class="grid" id="grid"></div>
-  <button id="loadMoreBtn">Load More Movies</button>
+  <div id="catalogue-view">
+    <div class="grid" id="grid"></div>
+    <button id="loadMoreBtn">Load More Movies</button>
+  </div>
+
+  <div id="map-view">
+    <div id="map"></div>
+  </div>
 
   <script>
-    // --- 1. PASTE YOUR API KEY BETWEEN THE QUOTES BELOW ---
+    // --- 1. PASTE YOUR API KEY HERE ---
     const API_KEY = 'f6b6cac733975d8c7f6a17ceba13fcba';
     
+    // --- Setup UI Elements ---
     const fileInput = document.getElementById('csvFile');
     const goBtn = document.getElementById('goBtn');
     const grid = document.getElementById('grid');
     const loading = document.getElementById('loading');
     const loadMoreBtn = document.getElementById('loadMoreBtn');
+    
+    const tabCatalogue = document.getElementById('tab-catalogue');
+    const tabMap = document.getElementById('tab-map');
+    const viewCatalogue = document.getElementById('catalogue-view');
+    const viewMap = document.getElementById('map-view');
 
     let moviesList = [];
     let currentIndex = 0;
     const BATCH_SIZE = 18;
 
-    // 2. Show the "Go" button when a file is selected
-    fileInput.addEventListener('change', () => {
-      if (fileInput.files.length > 0) {
-        goBtn.style.display = 'inline-block';
-      } else {
-        goBtn.style.display = 'none';
-      }
+    // --- Setup The Map ---
+    const map = L.map('map').setView([20, 0], 2); // Centers the map on the world
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Dictionary of GPS Coordinates for major movie-producing countries [Latitude, Longitude]
+    const countryCoords = {
+      "United States of America": [39.8, -98.5], "United Kingdom": [55.3, -3.4],
+      "France": [46.2, 2.2], "Japan": [36.2, 138.2], "South Korea": [35.9, 127.7],
+      "India": [20.5, 78.9], "Italy": [41.8, 12.5], "Germany": [51.1, 10.4],
+      "Canada": [56.1, -106.3], "Spain": [40.4, -3.7], "Australia": [-25.2, 133.7],
+      "China": [35.8, 104.1], "Mexico": [23.6, -102.5], "Brazil": [-14.2, -51.9],
+      "Russia": [61.5, 105.3], "Sweden": [60.1, 18.6], "Denmark": [56.2, 9.5],
+      "Hong Kong": [22.3, 114.1], "Taiwan": [23.6, 120.9], "Argentina": [-38.4, -63.6]
+    };
+
+    // --- Tab Switching Logic ---
+    tabCatalogue.addEventListener('click', () => {
+      tabCatalogue.classList.add('active');
+      tabMap.classList.remove('active');
+      viewCatalogue.style.display = 'block';
+      viewMap.style.display = 'none';
     });
 
-    // 3. Process the file when "Go" is clicked
+    tabMap.addEventListener('click', () => {
+      tabMap.classList.add('active');
+      tabCatalogue.classList.remove('active');
+      viewCatalogue.style.display = 'none';
+      viewMap.style.display = 'block';
+      // Map needs to be told to resize when it comes out of hiding
+      setTimeout(() => { map.invalidateSize(); }, 100); 
+    });
+
+    // --- File Processing ---
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files.length > 0) goBtn.style.display = 'inline-block';
+      else goBtn.style.display = 'none';
+    });
+
     goBtn.addEventListener('click', () => {
-      // Safety Check 1: Did the API key get pasted correctly?
       if (API_KEY === 'YOUR_API_KEY_HERE' || API_KEY === '') {
-        alert("Hold up! The API Key is missing. Please paste it into line 42 of your code.");
+        alert("Hold up! The API Key is missing. Please paste it into line 64 of your code.");
         return;
       }
-
       const file = fileInput.files[0];
       if (!file) return;
 
@@ -81,48 +145,37 @@
         header: true,
         skipEmptyLines: true,
         complete: function(results) {
-          // Look for 'Name' or 'Title' to be extra safe with different CSV formats
           moviesList = results.data.filter(row => (row['Name'] || row['Title']) && row['Year']);
           currentIndex = 0;
-          
-          // Safety Check 2: Did it find any movies?
           if (moviesList.length === 0) {
-            alert("We read the file, but couldn't find any movie names! Make sure this is a real Letterboxd CSV export.");
+            alert("No movies found! Ensure this is a Letterboxd CSV.");
             goBtn.style.display = 'inline-block';
             return;
           }
-
           loadNextBatch();
         }
       });
     });
 
-    // 4. Load the movies in batches
     async function loadNextBatch() {
       loading.style.display = 'block';
       loadMoreBtn.style.display = 'none';
 
       const batch = moviesList.slice(currentIndex, currentIndex + BATCH_SIZE);
-
       for (let row of batch) {
         const title = row['Name'] || row['Title'];
         const year = row['Year'];
         const letterboxdUrl = row['Letterboxd URI'] || row['Letterboxd URL'] || '#';
-        
         await fetchMovieData(title, year, letterboxdUrl);
       }
 
       currentIndex += BATCH_SIZE;
       loading.style.display = 'none';
-
-      if (currentIndex < moviesList.length) {
-        loadMoreBtn.style.display = 'inline-block';
-      }
+      if (currentIndex < moviesList.length) loadMoreBtn.style.display = 'inline-block';
     }
 
     loadMoreBtn.addEventListener('click', loadNextBatch);
 
-    // 5. Ask TMDB for the poster and details
     async function fetchMovieData(title, year, url) {
       try {
         const searchRes = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${API_KEY}&query=${encodeURIComponent(title)}&year=${year}`);
@@ -130,7 +183,6 @@
 
         if (searchData.results && searchData.results.length > 0) {
           const movie = searchData.results[0];
-          
           const detailsRes = await fetch(`https://api.themoviedb.org/3/movie/${movie.id}?api_key=${API_KEY}&append_to_response=credits`);
           const details = await detailsRes.json();
 
@@ -139,10 +191,11 @@
           const director = directorData ? directorData.name : 'Unknown';
           const country = details.production_countries.length > 0 ? details.production_countries[0].name : 'Unknown';
 
+          // 1. Build the Grid Card
           const card = document.createElement('a');
           card.className = 'card';
           card.href = url;
-          card.target = '_blank'; // Opens link in a new tab
+          card.target = '_blank';
           card.innerHTML = `
             <img src="${poster}" alt="${title}">
             <div class="info">
@@ -152,6 +205,25 @@
             </div>
           `;
           grid.appendChild(card);
+
+          // 2. Add to Map (if we know the country coordinates)
+          if (countryCoords[country]) {
+            // Add a tiny random offset so movies from the same country don't perfectly overlap
+            const latOffset = (Math.random() - 0.5) * 4; 
+            const lngOffset = (Math.random() - 0.5) * 4;
+            const finalLat = countryCoords[country][0] + latOffset;
+            const finalLng = countryCoords[country][1] + lngOffset;
+
+            const marker = L.marker([finalLat, finalLng]).addTo(map);
+            
+            // Pop-up bubble when you click the map pin
+            marker.bindPopup(`
+              <strong>${title}</strong><br>
+              <a href="${url}" target="_blank">
+                <img src="${poster}" alt="${title}" style="width: 100px; cursor: pointer;">
+              </a>
+            `);
+          }
         }
       } catch (e) {
         console.error('Error loading movie:', title);

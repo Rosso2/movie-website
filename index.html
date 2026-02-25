@@ -25,6 +25,22 @@
       border-radius: 5px;
       cursor: pointer;
     }
+    /* The new Green Go Button */
+    #goBtn {
+      display: none; /* Hidden until a file is chosen */
+      background-color: #4CAF50; 
+      color: white;
+      border: none;
+      padding: 10px 24px;
+      font-size: 1rem;
+      border-radius: 5px;
+      cursor: pointer;
+      margin-left: 10px;
+      transition: background-color 0.2s;
+    }
+    #goBtn:hover {
+      background-color: #45a049;
+    }
     .movie-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -33,6 +49,7 @@
       max-width: 1200px;
       margin: 0 auto;
     }
+    /* We changed the card to act like a clickable link! */
     .movie-card {
       background-color: #222;
       border-radius: 8px;
@@ -40,9 +57,14 @@
       box-shadow: 0 4px 15px rgba(0,0,0,0.5);
       text-align: left;
       transition: transform 0.2s;
+      text-decoration: none; /* Removes the blue underline from links */
+      color: inherit; /* Keeps the text white */
+      display: block;
+      cursor: pointer;
     }
     .movie-card:hover {
       transform: scale(1.03);
+      box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4); /* Adds a subtle green glow on hover */
     }
     .movie-card img {
       width: 100%;
@@ -75,10 +97,9 @@
     #loading {
       display: none;
       font-size: 1.2rem;
-      color: #e50914; /* Netflix red */
+      color: #4CAF50;
       margin: 20px 0;
     }
-    /* New styling for the Load More button */
     #loadMoreBtn {
       display: none;
       background-color: #e50914;
@@ -99,14 +120,16 @@
 <body>
 
   <div class="header-section">
-    <h1>🎬 RaphMovie Catalogue</h1>
+    <h1>🎬 raphmovie Catalogue</h1>
     <p>Upload your Letterboxd CSV to generate your visual database.</p>
+    
     <input type="file" id="csvFileInput" accept=".csv">
+    <button id="goBtn">Go</button>
+    
     <p id="loading">Loading movies... please wait.</p>
   </div>
 
   <div class="movie-grid" id="movie-container"></div>
-  
   <button id="loadMoreBtn">Load More Movies</button>
 
   <script>
@@ -114,61 +137,45 @@
     const API_KEY = 'f6b6cac733975d8c7f6a17ceba13fcba';
     
     const fileInput = document.getElementById('csvFileInput');
+    const goBtn = document.getElementById('goBtn');
     const container = document.getElementById('movie-container');
     const loadingText = document.getElementById('loading');
     const loadMoreBtn = document.getElementById('loadMoreBtn');
 
-    // Variables to keep track of our batch loading
     let allMovies = [];
     let currentIndex = 0;
-    const BATCH_SIZE = 18; // Loads 18 movies at a time
+    const BATCH_SIZE = 18; 
 
-    // Listen for file upload
+    // 2. Show the "Go" button ONLY when a file is selected
     fileInput.addEventListener('change', function(event) {
-      const file = event.target.files[0];
+      if (event.target.files.length > 0) {
+        goBtn.style.display = 'inline-block';
+      } else {
+        goBtn.style.display = 'none';
+      }
+    });
+
+    // 3. Wait for the user to click "Go" to start reading the file
+    goBtn.addEventListener('click', function() {
+      const file = fileInput.files[0];
       if (!file) return;
 
+      goBtn.style.display = 'none'; // Hide the Go button once clicked
       container.innerHTML = ''; 
       
       Papa.parse(file, {
         header: true,
         skipEmptyLines: true,
         complete: function(results) {
-          // Filter out any broken rows that don't have a name
           allMovies = results.data.filter(row => row['Name'] && row['Year']);
           currentIndex = 0; 
-          
-          // Start loading the first batch
           loadNextBatch();
         }
       });
     });
 
-    // Function to load the next chunk of movies
     async function loadNextBatch() {
       loadingText.style.display = 'block';
       loadMoreBtn.style.display = 'none';
 
-      // Slice the next 18 movies from our total list
-      const moviesToLoad = allMovies.slice(currentIndex, currentIndex + BATCH_SIZE);
-
-      for (let row of moviesToLoad) {
-        await fetchAndDisplayMovie(row['Name'], row['Year']);
-      }
-
-      // Update our tracker
-      currentIndex += BATCH_SIZE;
-      loadingText.style.display = 'none';
-
-      // If we haven't reached the end of the list, show the button again
-      if (currentIndex < allMovies.length) {
-        loadMoreBtn.style.display = 'inline-block';
-      }
-    }
-
-    // When the button is clicked, load the next batch!
-    loadMoreBtn.addEventListener('click', loadNextBatch);
-
-    async function fetchAndDisplayMovie(title, year) {
-      try {
-        const searchUrl = `https://api.themoviedb.org/3/search/movie?api_key=${API_KEY}&query
+      const moviesToLoad = allMovies.slice(currentIndex, currentIndex + BATCH_

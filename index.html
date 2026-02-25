@@ -3,179 +3,161 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>raphmovie - Letterboxd Visualizer</title>
+  <title>raphmovie - Letterboxd Database</title>
   
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
   
   <style>
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: #141414;
-      color: #eaeaea;
-      text-align: center;
-      padding: 20px;
-    }
-    .header-section {
-      margin-bottom: 40px;
-    }
-    input[type="file"] {
-      background-color: #333;
-      color: white;
-      padding: 10px;
-      border-radius: 5px;
-      cursor: pointer;
-    }
-    /* The new Green Go Button */
-    #goBtn {
-      display: none; /* Hidden until a file is chosen */
-      background-color: #4CAF50; 
-      color: white;
-      border: none;
-      padding: 10px 24px;
-      font-size: 1rem;
-      border-radius: 5px;
-      cursor: pointer;
-      margin-left: 10px;
-      transition: background-color 0.2s;
-    }
-    #goBtn:hover {
-      background-color: #45a049;
-    }
-    .movie-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-      gap: 25px;
-      padding: 20px;
-      max-width: 1200px;
-      margin: 0 auto;
-    }
-    /* We changed the card to act like a clickable link! */
-    .movie-card {
-      background-color: #222;
-      border-radius: 8px;
-      overflow: hidden;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-      text-align: left;
-      transition: transform 0.2s;
-      text-decoration: none; /* Removes the blue underline from links */
-      color: inherit; /* Keeps the text white */
-      display: block;
-      cursor: pointer;
-    }
-    .movie-card:hover {
-      transform: scale(1.03);
-      box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4); /* Adds a subtle green glow on hover */
-    }
-    .movie-card img {
-      width: 100%;
-      height: 330px;
-      object-fit: cover;
-      display: block;
-    }
-    .movie-info {
-      padding: 15px;
-    }
-    .movie-info h3 {
-      margin: 0 0 5px 0;
-      font-size: 1.1rem;
-      color: #fff;
-    }
-    .movie-info p {
-      margin: 4px 0;
-      font-size: 0.85rem;
-      color: #bbb;
-    }
-    .tag {
-      display: inline-block;
-      background-color: #444;
-      padding: 3px 8px;
-      border-radius: 12px;
-      font-size: 0.75rem;
-      margin-top: 8px;
-      color: #fff;
-    }
-    #loading {
-      display: none;
-      font-size: 1.2rem;
-      color: #4CAF50;
-      margin: 20px 0;
-    }
-    #loadMoreBtn {
-      display: none;
-      background-color: #e50914;
-      color: white;
-      border: none;
-      padding: 12px 24px;
-      font-size: 1rem;
-      border-radius: 5px;
-      cursor: pointer;
-      margin: 20px auto 60px auto;
-      transition: background-color 0.2s;
-    }
-    #loadMoreBtn:hover {
-      background-color: #f40612;
-    }
+    body { font-family: 'Segoe UI', sans-serif; background-color: #141414; color: white; text-align: center; padding: 20px; }
+    .controls { margin-bottom: 30px; }
+    input[type="file"] { background: #333; color: white; padding: 10px; border-radius: 5px; cursor: pointer; }
+    #goBtn { display: none; background: #4CAF50; color: white; border: none; padding: 11px 24px; margin-left: 10px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 1rem; }
+    #goBtn:hover { background: #45a049; }
+    #loading { display: none; color: #4CAF50; margin-top: 20px; font-size: 1.1rem; }
+    
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; max-width: 1200px; margin: 0 auto; }
+    .card { background: #222; border-radius: 8px; overflow: hidden; text-decoration: none; color: white; display: flex; flex-direction: column; transition: transform 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+    .card:hover { transform: scale(1.04); box-shadow: 0 4px 20px rgba(76, 175, 80, 0.4); }
+    .card img { width: 100%; height: 300px; object-fit: cover; }
+    .info { padding: 15px; text-align: left; }
+    .info h3 { margin: 0 0 5px 0; font-size: 1rem; }
+    .info p { margin: 2px 0; font-size: 0.8rem; color: #aaa; }
+    
+    #loadMoreBtn { display: none; background: #e50914; color: white; border: none; padding: 12px 24px; margin-top: 40px; border-radius: 5px; cursor: pointer; font-size: 1rem; }
+    #loadMoreBtn:hover { background: #f40612; }
   </style>
 </head>
 <body>
 
-  <div class="header-section">
-    <h1>🎬 RaphMovie Catalogue</h1>
-    <p>Upload your Letterboxd CSV to generate your visual database.</p>
-    
-    <input type="file" id="csvFileInput" accept=".csv">
-    <button id="goBtn">Go</button>
-    
-    <p id="loading">Loading movies... please wait.</p>
+  <div class="controls">
+    <h1>🍿 raphmovie Catalogue</h1>
+    <p>Upload your Letterboxd CSV database below:</p>
+    <input type="file" id="csvFile" accept=".csv">
+    <button id="goBtn">Go!</button>
+    <p id="loading">Loading your movies... please wait.</p>
   </div>
 
-  <div class="movie-grid" id="movie-container"></div>
+  <div class="grid" id="grid"></div>
   <button id="loadMoreBtn">Load More Movies</button>
 
   <script>
-    // 1. PASTE YOUR TMDB API KEY HERE!
+    // --- 1. PASTE YOUR API KEY BETWEEN THE QUOTES BELOW ---
     const API_KEY = 'f6b6cac733975d8c7f6a17ceba13fcba';
     
-    const fileInput = document.getElementById('csvFileInput');
+    const fileInput = document.getElementById('csvFile');
     const goBtn = document.getElementById('goBtn');
-    const container = document.getElementById('movie-container');
-    const loadingText = document.getElementById('loading');
+    const grid = document.getElementById('grid');
+    const loading = document.getElementById('loading');
     const loadMoreBtn = document.getElementById('loadMoreBtn');
 
-    let allMovies = [];
+    let moviesList = [];
     let currentIndex = 0;
-    const BATCH_SIZE = 18; 
+    const BATCH_SIZE = 18;
 
-    // 2. Show the "Go" button ONLY when a file is selected
-    fileInput.addEventListener('change', function(event) {
-      if (event.target.files.length > 0) {
+    // 2. Show the "Go" button when a file is selected
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files.length > 0) {
         goBtn.style.display = 'inline-block';
       } else {
         goBtn.style.display = 'none';
       }
     });
 
-    // 3. Wait for the user to click "Go" to start reading the file
-    goBtn.addEventListener('click', function() {
+    // 3. Process the file when "Go" is clicked
+    goBtn.addEventListener('click', () => {
+      // Safety Check 1: Did the API key get pasted correctly?
+      if (API_KEY === 'YOUR_API_KEY_HERE' || API_KEY === '') {
+        alert("Hold up! The API Key is missing. Please paste it into line 42 of your code.");
+        return;
+      }
+
       const file = fileInput.files[0];
       if (!file) return;
 
-      goBtn.style.display = 'none'; // Hide the Go button once clicked
-      container.innerHTML = ''; 
+      goBtn.style.display = 'none';
+      grid.innerHTML = '';
       
       Papa.parse(file, {
         header: true,
         skipEmptyLines: true,
         complete: function(results) {
-          allMovies = results.data.filter(row => row['Name'] && row['Year']);
-          currentIndex = 0; 
+          // Look for 'Name' or 'Title' to be extra safe with different CSV formats
+          moviesList = results.data.filter(row => (row['Name'] || row['Title']) && row['Year']);
+          currentIndex = 0;
+          
+          // Safety Check 2: Did it find any movies?
+          if (moviesList.length === 0) {
+            alert("We read the file, but couldn't find any movie names! Make sure this is a real Letterboxd CSV export.");
+            goBtn.style.display = 'inline-block';
+            return;
+          }
+
           loadNextBatch();
         }
       });
     });
 
+    // 4. Load the movies in batches
     async function loadNextBatch() {
-      loadingText.style.display = 'block';
+      loading.style.display = 'block';
       loadMoreBtn.style.display = 'none';
 
-      const moviesToLoad = allMovies.slice(currentIndex, currentIndex + BATCH_
+      const batch = moviesList.slice(currentIndex, currentIndex + BATCH_SIZE);
+
+      for (let row of batch) {
+        const title = row['Name'] || row['Title'];
+        const year = row['Year'];
+        const letterboxdUrl = row['Letterboxd URI'] || row['Letterboxd URL'] || '#';
+        
+        await fetchMovieData(title, year, letterboxdUrl);
+      }
+
+      currentIndex += BATCH_SIZE;
+      loading.style.display = 'none';
+
+      if (currentIndex < moviesList.length) {
+        loadMoreBtn.style.display = 'inline-block';
+      }
+    }
+
+    loadMoreBtn.addEventListener('click', loadNextBatch);
+
+    // 5. Ask TMDB for the poster and details
+    async function fetchMovieData(title, year, url) {
+      try {
+        const searchRes = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${API_KEY}&query=${encodeURIComponent(title)}&year=${year}`);
+        const searchData = await searchRes.json();
+
+        if (searchData.results && searchData.results.length > 0) {
+          const movie = searchData.results[0];
+          
+          const detailsRes = await fetch(`https://api.themoviedb.org/3/movie/${movie.id}?api_key=${API_KEY}&append_to_response=credits`);
+          const details = await detailsRes.json();
+
+          const poster = movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : 'https://via.placeholder.com/500x750?text=No+Poster';
+          const directorData = details.credits.crew.find(c => c.job === 'Director');
+          const director = directorData ? directorData.name : 'Unknown';
+          const country = details.production_countries.length > 0 ? details.production_countries[0].name : 'Unknown';
+
+          const card = document.createElement('a');
+          card.className = 'card';
+          card.href = url;
+          card.target = '_blank'; // Opens link in a new tab
+          card.innerHTML = `
+            <img src="${poster}" alt="${title}">
+            <div class="info">
+              <h3>${title} (${year})</h3>
+              <p><strong>Director:</strong> ${director}</p>
+              <p><strong>Country:</strong> ${country}</p>
+            </div>
+          `;
+          grid.appendChild(card);
+        }
+      } catch (e) {
+        console.error('Error loading movie:', title);
+      }
+    }
+  </script>
+
+</body>
+</html>
